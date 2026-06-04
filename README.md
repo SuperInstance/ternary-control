@@ -116,6 +116,14 @@ Part of the **SuperInstance** ternary computing ecosystem:
 - [`ternary-fuzzy`](https://crates.io/crates/ternary-fuzzy) — fuzzy logic with ternary membership
 - [`ternary-sensor`](https://crates.io/crates/ternary-sensor) — sensor classification and fusion
 
+## Known Limitations
+
+- **No anti-windup**: The PID controller accumulates integral error without bounds. Sustained error (e.g., actuator saturation) will cause integral windup, leading to large overshoots when the error finally changes sign.
+- **Deadband creates steady-state error**: The `with_deadband()` threshold means the controller outputs `Zero` for any continuous output within the deadband range, preventing the system from reaching the exact setpoint.
+- **No PID auto-tuning**: Gains (kp, ki, kd) must be manually tuned. There is no Ziegler-Nichols, relay feedback, or other auto-tuning method.
+- **Ternary output loses magnitude information**: The continuous PID output is projected to {-1, 0, +1}, discarding the magnitude. A large error and a small error produce the same `Positive` or `Negative` output, which can cause overshooting in systems that need proportional actuation.
+- **Bang-bang hysteresis is fixed**: The hysteresis band is set at construction and cannot adapt to changing process dynamics.
+
 ## License
 
 MIT
