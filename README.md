@@ -1,137 +1,92 @@
 # ternary-control
 
-Control theory with ternary decisions — PID controllers, bang-bang control with hysteresis, state machines, simulation loops, stability analysis, and deadband management.
+**Control theory with ternary decisions**
 
-## Why This Exists
+[![ternary](https://img.shields.io/badge/ecosystem-ternary-blue)](https://github.com/orgs/SuperInstance/repositories?q=ternary)
+[![tests](https://img.shields.io/badge/tests-22-green)]()
 
-Most control systems compute continuous outputs. But many actuators only have three states — reverse/off/forward, heat/off/cool, brake/coast/accelerate. Classical approaches either threshold a continuous controller (losing structure) or use bang-bang (losing nuance).
+## Overview
 
-**ternary-control** provides controllers that natively produce ternary outputs {Negative, Zero, Positive}. The PID controller runs continuous internal math but thresholds to ternary with configurable deadband. The bang-bang controller adds hysteresis to prevent chattering. A state machine routes ternary transitions, and a built-in simulation framework lets you test controllers against a first-order plant with full stability analysis.
+Control theory with ternary decisions.
 
-## Core Concepts
+PID controller with ternary output, BangBangControl, StateMachine,
+ControlLoop, stability analysis, and deadband management.
 
-| Type | Meaning |
-|---|---|
-| `TernaryOutput` | Control action: `Negative` (-1), `Zero` (0), `Positive` (+1) |
-| `PidController` | PID with continuous internals and ternary output |
-| `BangBangControl` | On/off controller with hysteresis bands |
-| `StateMachine` | Finite state machine with ternary transition outputs |
-| `ControlLoop` | Simulated plant for testing controllers |
-| `StabilityAnalysis` | Overshoot, settling time, rise time, steady-state error |
-| `Deadband` | Hysteresis-like deadband manager |
+## Architecture
 
-## Quick Start
+- **`PidController`** — core data structure
+- **`BangBangControl`** — core data structure
+- **`StateLabel`** — core data structure
+- **`Transition`** — core data structure
+- **`StateMachine`** — core data structure
+- **`ControlLoop`** — core data structure
+- **`StabilityAnalysis`** — core data structure
+- **`Deadband`** — core data structure
+- **`TernaryOutput`** — state enumeration
 
-```toml
-# Cargo.toml
-[dependencies]
-ternary-control = "0.1"
-```
+### Key Functions
 
-```rust
-use ternary_control::*;
+- `from_i8()`
+- `to_i8()`
+- `new()`
+- `with_deadband()`
+- `compute()`
+- `compute_ternary()`
+- `reset()`
+- `integral()`
+- `new()`
+- `update()`
+- ... and 28 more
 
-fn main() {
-    // PID controller with ternary output and deadband
-    let mut pid = PidController::new(2.0, 0.5, 0.3).with_deadband(0.5);
+## Why Ternary?
 
-    // Simulate against a plant
-    let mut plant = ControlLoop::new(0.0, 1.0, 0.1);
-    let history = plant.simulate_pid(&mut pid, 10.0, 100);
+The balanced ternary system {-1, 0, +1} (also known as Z₃) is the mathematically optimal discrete encoding:
+- **More expressive than binary**: three states capture positive, neutral, and negative
+- **Natural for decisions**: accept/reject/abstain, buy/hold/sell, agree/disagree/neutral
+- **Self-balancing**: the 0 state acts as a universal screen, preventing pathological lock-in
+- **Z₃ cyclic dynamics**: rock-paper-scissors is the only natural coordination mechanism
 
-    println!("Final state: {:.2}", plant.state());
-    println!("Steady-state error: {:.4}",
-        StabilityAnalysis::steady_state_error(&history, 10.0));
-    println!("Overshoot: {:.1}%",
-        StabilityAnalysis::overshoot(&history, 10.0) * 100.0);
+## Stats
 
-    // Bang-bang control with hysteresis
-    let mut bb = BangBangControl::new(50.0, 2.0);
-    let action = bb.update(45.0); // error = +5 > hysteresis → Positive
-    println!("Bang-bang output: {:?}", action);
-}
-```
-
-## API Overview
-
-### PidController
-- `new(kp, ki, kd)` — create with gains
-- `with_deadband(width)` — set deadband for ternary output
-- `compute(setpoint, measurement) → f64` — continuous PID output
-- `compute_ternary(setpoint, measurement) → TernaryOutput` — ternary output with deadband
-- `reset()` — clear integral and derivative state
-
-### BangBangControl
-- `new(setpoint, hysteresis)` — create with hysteresis band
-- `update(measurement) → TernaryOutput` — compute control action
-- `set_setpoint(sp)` — change target
-
-### StateMachine
-- `new(initial_state)` — create
-- `add_transition(from, Transition)` — add a guarded transition
-- `step(input) → TernaryOutput` — process input, transition if condition met
-- `reset(state)` — return to a given state
-
-### ControlLoop (simulation)
-- `new(initial, gain, dt)` — first-order plant
-- `step(TernaryOutput)` / `step_continuous(f64)` — advance one timestep
-- `simulate_pid(pid, setpoint, steps) → Vec<f64>` — full PID simulation
-- `simulate_bangbang(bb, steps) → Vec<f64>` — full bang-bang simulation
-
-### StabilityAnalysis
-- `is_stable(response, tolerance)` — bounded convergence check
-- `overshoot(response, setpoint) → f64` — fractional overshoot
-- `settling_time(response, setpoint, tolerance) → Option<usize>` — time to settle
-- `steady_state_error(response, setpoint) → f64` — final average error
-- `rise_time(response, setpoint, initial) → Option<usize>` — 90% rise time
-
-### Deadband
-- `new(center, width)` / `symmetric(threshold)` — create
-- `apply(value) → TernaryOutput` — with hysteresis (remembers last output)
-- `apply_strict(value) → TernaryOutput` — without hysteresis (returns to Zero)
-
-## How It Works
-
-**PID controller** computes the standard proportional-integral-derivative output: `u = kp * e + ki * Σe + kd * Δe`. For ternary output, it thresholds the continuous value against a configurable deadband: values within ±deadband produce `Zero` (no action), positive outputs produce `Positive`, and negative produce `Negative`. This prevents chattering around the setpoint.
-
-**Bang-bang control** is a three-state thermostat with hysteresis. It stays in its current state (Positive, Zero, or Negative) until the error crosses the hysteresis threshold, then switches. The hysteresis band prevents rapid oscillation: the controller must see the error move well past zero before changing direction.
-
-**State machine** stores a map of state → transition rules. Each transition has a condition function and a ternary output. When `step(input)` is called, it evaluates transitions for the current state in order; the first matching condition fires, transitioning to the target state and returning the associated output.
-
-**Stability analysis** examines a simulated response trajectory. It checks the last third of the response for boundedness, finds the maximum overshoot relative to the setpoint, identifies when the signal first enters and stays within a tolerance band (settling time), and computes the average error of the final samples (steady-state error).
-
-## Use Cases
-
-- **HVAC systems** — bang-bang temperature control with hysteresis to prevent compressor short-cycling, ternary heat/off/cool output
-- **Motor control** — PID with ternary output for forward/stop/reverse, with deadband to prevent dithering at zero velocity
-- **Process control** — state machine governing multi-stage processes (idle → heating → stable → cooling) with ternary actuation at each stage
+| Metric | Value |
+|--------|-------|
+| Lines of Rust | 563 |
+| Test count | 22 |
+| Public types | 9 |
+| Public functions | 38 |
 
 ## Ecosystem
 
-Part of the **SuperInstance** ternary computing ecosystem:
+This crate is part of the **[SuperInstance Ternary Fleet](https://github.com/orgs/SuperInstance/repositories?q=ternary)**:
 
-- [`ternary`](https://crates.io/crates/ternary) — core trit types and balanced ternary arithmetic
-- [`ternary-control`](https://crates.io/crates/ternary-control) — this crate
-- [`ternary-kalman`](https://crates.io/crates/ternary-kalman) — Kalman filtering for ternary states
-- [`ternary-fuzzy`](https://crates.io/crates/ternary-fuzzy) — fuzzy logic with ternary membership
-- [`ternary-sensor`](https://crates.io/crates/ternary-sensor) — sensor classification and fusion
+- **[ternary-core](https://github.com/SuperInstance/ternary-core)** — shared traits and Z₃ arithmetic
+- **[ternary-grid](https://github.com/SuperInstance/ternary-grid)** — spatial grid with {-1, 0, +1} cells
+- **[ternary-graph](https://github.com/SuperInstance/ternary-graph)** — ternary-weighted graph algorithms
+- **[ternary-automata](https://github.com/SuperInstance/ternary-automata)** — three-state cellular automata
+- **[ternary-compiler](https://github.com/SuperInstance/ternary-compiler)** — expression compiler and optimizer
 
-## Known Limitations
+200+ crates. 4,300+ tests. One pattern.
 
-- **No anti-windup**: The PID controller accumulates integral error without bounds. Sustained error (e.g., actuator saturation) will cause integral windup, leading to large overshoots when the error finally changes sign.
-- **Deadband creates steady-state error**: The `with_deadband()` threshold means the controller outputs `Zero` for any continuous output within the deadband range, preventing the system from reaching the exact setpoint.
-- **No PID auto-tuning**: Gains (kp, ki, kd) must be manually tuned. There is no Ziegler-Nichols, relay feedback, or other auto-tuning method.
-- **Ternary output loses magnitude information**: The continuous PID output is projected to {-1, 0, +1}, discarding the magnitude. A large error and a small error produce the same `Positive` or `Negative` output, which can cause overshooting in systems that need proportional actuation.
-- **Bang-bang hysteresis is fixed**: The hysteresis band is set at construction and cannot adapt to changing process dynamics.
+## Research Context
+
+The ternary approach connects to several active research areas:
+- **Ternary Neural Networks** (TNNs): weights constrained to {-1, 0, +1} for efficient inference
+- **Huawei's ternary chip**: 7nm ternary silicon with 60% less power consumption
+- **Active inference**: free energy minimization naturally maps to ternary action selection
+- **Cyclic dominance**: RPS dynamics maintain biodiversity in spatial ecology
+- **Z₃ group theory**: the only algebraic group on three elements is cyclic addition mod 3
+
+## Usage
+
+```toml
+[dependencies]
+ternary-control = "0.1.0"
+```
+
+```rust
+use ternary_control;
+```
 
 ## License
 
 MIT
-
-## See Also
-- **ternary-robotics** — related
-- **ternary-sensor** — related
-- **ternary-kalman** — related
-- **ternary-hardware** — related
-- **ternary-circuit** — related
-
