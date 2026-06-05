@@ -127,3 +127,11 @@ Part of the **SuperInstance** ternary computing ecosystem:
 ## License
 
 MIT
+
+## See Also
+- **ternary-robotics** — related
+- **ternary-sensor** — related
+- **ternary-kalman** — related
+- **ternary-hardware** — related
+- **ternary-circuit** — related
+
