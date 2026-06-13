@@ -76,6 +76,19 @@ In **SuperInstance**, ternary control manages GPU clock speeds, fan curves, and 
 - Khalil, Hassan K. *Nonlinear Systems*, 3rd ed., Prentice Hall, 2002 — Lyapunov stability.
 - Franklin, Gene F. et al. *Feedback Control of Dynamic Systems*, 8th ed., Pearson, 2019.
 
+
+
+## Complexity Summary
+
+| Component | Time per Step | Notes |
+|---|---|---|
+| PID compute | O(1) | 3 multiplications, 2 additions |
+| Deadband classify | O(1) | One comparison |
+| State machine | O(1) | Table lookup |
+| Control loop | O(1) | Dominated by sensor I/O |
+
+The ternary PID is O(1) per control step, making it suitable for real-time GPU frequency scaling at microsecond intervals.
+
 ## License
 
 MIT
